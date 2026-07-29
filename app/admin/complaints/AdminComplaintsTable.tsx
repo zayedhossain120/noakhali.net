@@ -191,7 +191,12 @@ function TableInner() {
                       </div>
                       <p className="mt-1 text-sm text-gray-500">
                         {c.category} · {c.area}
-                        {c.reporterName ? ` · ${c.reporterName}` : ""}
+                        {c.reporterName && (
+                          <span className="font-medium text-gray-500 text-xl ">
+                            {" "}
+                            · {c.reporterName}
+                          </span>
+                        )}
                       </p>
                     </div>
                     <button
@@ -263,6 +268,14 @@ function TableInner() {
           <p className="mt-2 whitespace-pre-wrap text-gray-700">
             {modalComplaint.description}
           </p>
+          {modalComplaint.reporterName && (
+            <p className="mt-2 text-gray-500 text-xl font-medium">
+              Reporter:{" "}
+              <span className="font-bold text-gray-500">
+                {modalComplaint.reporterName}
+              </span>
+            </p>
+          )}
           {modalComplaint.reporterContact && (
             <p className="mt-2 text-gray-500">
               Contact: {modalComplaint.reporterContact}
