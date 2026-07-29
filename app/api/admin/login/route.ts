@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   if (isRateLimited(`login:${ip}`)) {
     return NextResponse.json(
       { error: "Too many attempts. Please try again shortly." },
-      { status: 429 }
+      { status: 429 },
     );
   }
 
@@ -21,7 +21,10 @@ export async function POST(request: NextRequest) {
   const parsed = adminLoginSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid email or password" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid email or password" },
+      { status: 400 },
+    );
   }
 
   await connectToDatabase();
@@ -32,12 +35,15 @@ export async function POST(request: NextRequest) {
   // to avoid leaking which admin accounts exist.
   const genericError = NextResponse.json(
     { error: "Invalid email or password" },
-    { status: 401 }
+    { status: 401 },
   );
 
   if (!admin) return genericError;
 
-  const passwordMatches = await bcrypt.compare(parsed.data.password, admin.password);
+  const passwordMatches = await bcrypt.compare(
+    parsed.data.password,
+    admin.password,
+  );
   if (!passwordMatches) return genericError;
 
   const token = await signAdminToken({
@@ -49,16 +55,33 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({
     success: true,
-    admin: { id: admin._id.toString(), name: admin.name, email: admin.email, role: admin.role },
+    admin: {
+      id: admin._id.toString(),
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+    },
   });
 
+  // Set auth cookie with strict security flags
   response.cookies.set(AUTH_COOKIE_NAME, token, {
     httpOnly: true,
+    // Ensure cookie is only sent over HTTPS in production; allow HTTP in dev
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    // Use SameSite=strict for admin routes to mitigate CSRF
+    sameSite: "strict",
     path: "/",
     maxAge: 8 * 60 * 60, // 8 hours, matches token expiry
+    // Prevent client‑side script access entirely
+    // (httpOnly already covers this, but keeping explicit for clarity)
+    // Also mitigate potential XSS leakage
+    // No need for `domain` unless multi‑subdomain setup
   });
+
+  // Prevent caching of login responses and add basic security headers
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "DENY");
 
   return response;
 }

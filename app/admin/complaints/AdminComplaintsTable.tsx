@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, Suspense } from "react";
+import Modal from "@/components/Modal";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { CATEGORIES, STATUS_VALUES } from "@/lib/validation";
 import StatusBadge from "@/components/StatusBadge";
@@ -39,6 +40,10 @@ function TableInner() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // state for showing a modal with the current complaint details
+  const [modalComplaint, setModalComplaint] = useState<AdminComplaint | null>(
+    null,
+  );
 
   const page = parseInt(searchParams.get("page") || "1", 10);
   const status = searchParams.get("status") || "";
@@ -103,12 +108,18 @@ function TableInner() {
   }
 
   async function deleteComplaint(id: string) {
-    if (!window.confirm("Delete this complaint permanently? This cannot be undone.")) {
+    if (
+      !window.confirm(
+        "Delete this complaint permanently? This cannot be undone.",
+      )
+    ) {
       return;
     }
     setBusyId(id);
     try {
-      const res = await fetch(`/api/admin/complaints/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/complaints/${id}`, {
+        method: "DELETE",
+      });
       if (res.ok) fetchData();
     } finally {
       setBusyId(null);
@@ -161,7 +172,9 @@ function TableInner() {
           <p className="text-gray-500">No complaints match your filters.</p>
         ) : (
           <>
-            <p className="mb-4 text-sm text-gray-500">{total} complaint(s) found</p>
+            <p className="mb-4 text-sm text-gray-500">
+              {total} complaint(s) found
+            </p>
             <div className="space-y-3">
               {data.map((c) => (
                 <div
@@ -171,7 +184,9 @@ function TableInner() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-brand-dark">{c.title}</h3>
+                        <h3 className="font-semibold text-brand-dark">
+                          {c.title}
+                        </h3>
                         <StatusBadge status={c.status} />
                       </div>
                       <p className="mt-1 text-sm text-gray-500">
@@ -180,26 +195,14 @@ function TableInner() {
                       </p>
                     </div>
                     <button
-                      onClick={() => setExpandedId(expandedId === c._id ? null : c._id)}
+                      onClick={() => setModalComplaint(c)}
                       className="shrink-0 text-sm font-medium text-brand-dark underline"
                     >
-                      {expandedId === c._id ? "Hide details" : "View details"}
+                      View details
                     </button>
                   </div>
 
-                  {expandedId === c._id && (
-                    <div className="mt-4 rounded-md bg-brand-cream p-4 text-sm text-gray-700">
-                      <p className="whitespace-pre-wrap">{c.description}</p>
-                      {c.reporterContact && (
-                        <p className="mt-2 text-gray-500">Contact: {c.reporterContact}</p>
-                      )}
-                      {c.adminNote && (
-                        <p className="mt-2 text-gray-500">
-                          <strong>Admin note:</strong> {c.adminNote}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  {/* Details are now shown in a modal, so inline block removed */}
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     {c.status === "PENDING" && (
@@ -251,6 +254,27 @@ function TableInner() {
       </div>
 
       <Pagination page={page} totalPages={totalPages} />
+      {modalComplaint && (
+        <Modal open={true} onClose={() => setModalComplaint(null)}>
+          <h2 className="text-lg font-semibold text-brand-dark mb-2">
+            {modalComplaint.title}
+          </h2>
+          <StatusBadge status={modalComplaint.status} />
+          <p className="mt-2 whitespace-pre-wrap text-gray-700">
+            {modalComplaint.description}
+          </p>
+          {modalComplaint.reporterContact && (
+            <p className="mt-2 text-gray-500">
+              Contact: {modalComplaint.reporterContact}
+            </p>
+          )}
+          {modalComplaint.adminNote && (
+            <p className="mt-2 text-gray-500">
+              <strong>Admin note:</strong> {modalComplaint.adminNote}
+            </p>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

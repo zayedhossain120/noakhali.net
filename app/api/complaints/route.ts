@@ -73,36 +73,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = await request.json().catch(() => null);
-  if (!body) {
+  // Accept any raw text (or JSON) payload
+  const rawBody = await request.text().catch(() => null);
+  if (!rawBody) {
     return NextResponse.json(
       { error: "Invalid request body" },
       { status: 400 },
     );
   }
 
-  const parsed = complaintInputSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Validation failed", details: parsed.error.flatten() },
-      { status: 400 },
-    );
+  // If the payload is JSON, try to parse it; otherwise treat it as plain text
+  let parsedData: any;
+  try {
+    parsedData = JSON.parse(rawBody);
+  } catch {
+    parsedData = { description: rawBody };
   }
 
-  // Honeypot triggered — silently pretend success to not tip off bots.
-  if (parsed.data.website) {
+  // Simple honeypot check: if a "website" field exists, pretend success
+  if (parsedData.website) {
     return NextResponse.json({ success: true }, { status: 201 });
   }
 
   await connectToDatabase();
 
   const complaint = await Complaint.create({
-    title: parsed.data.title,
-    description: parsed.data.description,
-    category: parsed.data.category,
-    area: parsed.data.area,
-    reporterName: parsed.data.reporterName || undefined,
-    reporterContact: parsed.data.reporterContact || undefined,
+    title: parsedData.title || "User Submission",
+    description: parsedData.description || parsedData.body || rawBody,
+    // Preserve optional fields if present
+    category: parsedData.category,
+    area: parsedData.area,
+    reporterName: parsedData.reporterName || undefined,
+    reporterContact: parsedData.reporterContact || undefined,
     status: "PENDING",
   });
 
